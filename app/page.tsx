@@ -2,6 +2,8 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import StarterQuestions from "@/components/StarterQuestions";
+import GeneralSettings from "@/components/GeneralSettings";
+import ConversationSettings from "@/components/ConversationSettings";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +20,7 @@ interface Settings {
   agentName: string;
   agentRole: string;
   avatarInitials: string;
+  agentAvatarUrl: string;
   colorScheme: ColorScheme;
   agentColor: string;
   agentStyle: AgentStyle;
@@ -32,7 +35,8 @@ interface Settings {
   starterQuestionsCollapse: string;
   agentLanguage: string;
   placeholderPrompt: string;
-  loadingIndicator: string;
+  loadingIndicator: "typing-dots" | "custom-message";
+  loadingCustomMessage: string;
   customMessageEnding: string;
   errorMessage: string;
   failedModerationMessage: string;
@@ -70,18 +74,21 @@ interface Settings {
   inChatAgentAvatar: boolean;
   inChatUserAvatar: boolean;
   termsOfService: string;
+  aiWarning: string;
   antiHallucination: boolean;
   agentVisibility: Visibility;
   recaptchaEnabled: boolean;
   whitelistedDomains: string;
   conversationRetention: RetentionPeriod;
   retentionDays: number;
+  agentInstructions: string;
 }
 
 const DEFAULTS: Settings = {
   agentName: "My Agent",
   agentRole: "enterprise-search",
   avatarInitials: "MA",
+  agentAvatarUrl: "",
   colorScheme: "adaptive",
   agentColor: "#7367F0",
   agentStyle: "soft",
@@ -96,7 +103,8 @@ const DEFAULTS: Settings = {
   starterQuestionsCollapse: "Show less",
   agentLanguage: "en",
   placeholderPrompt: "Ask me anything...",
-  loadingIndicator: "typing",
+  loadingIndicator: "typing-dots",
+  loadingCustomMessage: "",
   customMessageEnding: "",
   errorMessage: "Something went wrong. Please try again.",
   failedModerationMessage: "I'm unable to respond to that request.",
@@ -134,12 +142,14 @@ const DEFAULTS: Settings = {
   inChatAgentAvatar: true,
   inChatUserAvatar: false,
   termsOfService: "",
+  aiWarning: "",
   antiHallucination: true,
   agentVisibility: "public",
   recaptchaEnabled: false,
   whitelistedDomains: "",
   conversationRetention: "never",
   retentionDays: 30,
+  agentInstructions: "",
 };
 
 const LANGUAGES = [
@@ -402,11 +412,11 @@ function ConversationTab({ s, set }: { s: Settings; set: (k: keyof Settings, v: 
         <FieldRow icon="loader-2" label="Loading indicator">
           <div className="radio-group">
             <label className="radio-opt">
-              <input type="radio" name="loading" value="typing" checked={s.loadingIndicator === "typing"} onChange={() => set("loadingIndicator", "typing")} />
+              <input type="radio" name="loading" value="typing-dots" checked={s.loadingIndicator === "typing-dots"} onChange={() => set("loadingIndicator", "typing-dots")} />
               <span className="radio-opt-label">Typing dot animation</span>
             </label>
             <label className="radio-opt">
-              <input type="radio" name="loading" value="spinner" checked={s.loadingIndicator === "spinner"} onChange={() => set("loadingIndicator", "spinner")} />
+              <input type="radio" name="loading" value="custom-message" checked={s.loadingIndicator === "custom-message"} onChange={() => set("loadingIndicator", "custom-message")} />
               <span className="radio-opt-label">Spinner</span>
             </label>
           </div>
@@ -669,6 +679,20 @@ function AdvancedTab({ s, set }: { s: Settings; set: (k: keyof Settings, v: unkn
         <FieldRow icon="file-text" label="Terms of service">
           <textarea className="cg-textarea" value={s.termsOfService} onChange={e => set("termsOfService", e.target.value)} placeholder="Enter your terms of service text here…" rows={3} />
         </FieldRow>
+        <FieldRow icon="robot" label="AI warning" hint="Shown below the input on every deployment">
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <input
+              className="cg-input"
+              value={s.aiWarning}
+              maxLength={150}
+              onChange={e => set("aiWarning", e.target.value)}
+              placeholder="e.g. AI can make mistakes. Verify important info."
+            />
+            <span style={{ font: "400 11px/14px var(--cg-font)", color: s.aiWarning.length >= 140 ? "var(--cg-warning)" : "var(--cg-fg-4)", alignSelf: "flex-end" }}>
+              {s.aiWarning.length}/150
+            </span>
+          </div>
+        </FieldRow>
       </div>
     </>
   );
@@ -798,9 +822,40 @@ function PlaceholderTab({ title, desc }: { title: string; desc: string }) {
   );
 }
 
+// ─── Instructions Panel ───────────────────────────────────────────────────────
+
+const INSTRUCTIONS_MAX = 4000;
+
+function InstructionsPanel({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="instructions-panel">
+      <div className="instructions-header">
+        <span className="instructions-label">Agent instructions</span>
+        <span className="instructions-count">{value.length} / {INSTRUCTIONS_MAX}</span>
+      </div>
+      <textarea
+        className="instructions-textarea"
+        value={value}
+        onChange={e => onChange(e.target.value.slice(0, INSTRUCTIONS_MAX))}
+        placeholder={"Write custom instructions for your agent. These will be included in every conversation as the system prompt.\n\nExample:\nYou are a helpful customer support agent. Always be polite and professional. If you don't know the answer, say so clearly and offer to escalate to a human."}
+      />
+    </div>
+  );
+}
+
 // ─── Preview Panel ────────────────────────────────────────────────────────────
 
-function PreviewPanel({ s }: { s: Settings }) {
+function PreviewPanel({
+  s,
+  set,
+  rightPanel,
+  onRightPanelChange,
+}: {
+  s: Settings;
+  set: (k: keyof Settings, v: unknown) => void;
+  rightPanel: "preview" | "instructions";
+  onRightPanelChange: (v: "preview" | "instructions") => void;
+}) {
   const radius = { sharp: "0px", soft: "12px", round: "20px" }[s.agentStyle];
 
   return (
@@ -811,57 +866,87 @@ function PreviewPanel({ s }: { s: Settings }) {
           <div className="preview-dot" style={{ background: "#FFBD2E" }} />
           <div className="preview-dot" style={{ background: "#28C840" }} />
         </div>
-        <span className="preview-label">Live preview</span>
-        <div style={{ display: "flex", gap: 2 }}>
-          <button className="cg-btn cg-btn-ghost" style={{ padding: "4px 6px" }}>
-            <i className="ti ti-arrows-maximize" style={{ fontSize: 13 }} />
+        <div className="seg-ctrl">
+          <button
+            className={`seg-btn ${rightPanel === "preview" ? "active" : ""}`}
+            onClick={() => onRightPanelChange("preview")}
+          >
+            <i className="ti ti-eye" style={{ fontSize: 11 }} />
+            Preview
+          </button>
+          <button
+            className={`seg-btn ${rightPanel === "instructions" ? "active" : ""}`}
+            onClick={() => onRightPanelChange("instructions")}
+          >
+            <i className="ti ti-file-text" style={{ fontSize: 11 }} />
+            Instructions
           </button>
         </div>
+        <button className="cg-btn cg-btn-ghost" style={{ padding: "4px 6px" }}>
+          <i className="ti ti-arrows-maximize" style={{ fontSize: 13 }} />
+        </button>
       </div>
 
-      <div className="chat-widget">
-        <div className="chat-header" style={{ background: `linear-gradient(145deg, ${s.agentColor} 0%, ${s.agentColor}dd 100%)` }}>
-          {s.titleAvatarEnabled && (
-            <div className="chat-avatar">{s.avatarInitials}</div>
-          )}
-          <div className="chat-title" style={{ color: s.titleColor }}>
-            {s.agentTitle || s.agentName || "My Agent"}
-          </div>
-        </div>
-
-        <div className="chat-body">
-          {s.starterQuestionsEnabled && s.starterQuestions.length > 0 ? (
-            <div className="sq-preview-card">
-              <div className="sq-preview-header">{s.starterQuestionsHeader || s.agentName}</div>
-              {s.starterQuestions.slice(0, 3).map((q, i) => (
-                <div key={i} className="sq-preview-item" style={{ borderRadius: radius }}>
-                  <i className="ti ti-message-circle" style={{ fontSize: 13, color: s.agentColor, flexShrink: 0 }} />
-                  {q}
-                </div>
-              ))}
+      {rightPanel === "preview" ? (
+        <div className="chat-widget">
+          <div className="chat-header" style={{ background: `linear-gradient(145deg, ${s.agentColor} 0%, ${s.agentColor}dd 100%)` }}>
+            {s.titleAvatarEnabled && (
+              <div className="chat-avatar">{s.avatarInitials}</div>
+            )}
+            <div className="chat-title" style={{ color: s.titleColor }}>
+              {s.agentTitle || s.agentName || "My Agent"}
             </div>
-          ) : (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ textAlign: "center", color: "var(--cg-fg-4)", fontSize: 12 }}>
-                <i className="ti ti-message-2" style={{ fontSize: 28, display: "block", marginBottom: 8, color: `${s.agentColor}40` }} />
-                Ready to chat
+          </div>
+
+          <div className="chat-body">
+            {s.starterQuestionsEnabled && s.starterQuestions.length > 0 ? (
+              <div className="sq-preview-card">
+                <div className="sq-preview-header">{s.starterQuestionsHeader || s.agentName}</div>
+                {s.starterQuestions.slice(0, 3).map((q, i) => (
+                  <div key={i} className="sq-preview-item" style={{ borderRadius: radius }}>
+                    <i className="ti ti-message-circle" style={{ fontSize: 13, color: s.agentColor, flexShrink: 0 }} />
+                    {q}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ textAlign: "center", color: "var(--cg-fg-4)", fontSize: 12 }}>
+                  <i className="ti ti-message-2" style={{ fontSize: 28, display: "block", marginBottom: 8, color: `${s.agentColor}40` }} />
+                  Ready to chat
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="chat-footer">
+            <div className="chat-input-row" style={{ borderRadius: radius }}>
+              <span className="chat-placeholder">{s.placeholderPrompt || "Ask me anything…"}</span>
+              <div className="chat-send-btn" style={{ background: s.agentColor }}>
+                <i className="ti ti-send" style={{ fontSize: 13 }} />
               </div>
             </div>
-          )}
-        </div>
-
-        <div className="chat-footer">
-          <div className="chat-input-row" style={{ borderRadius: radius }}>
-            <span className="chat-placeholder">{s.placeholderPrompt || "Ask me anything…"}</span>
-            <div className="chat-send-btn" style={{ background: s.agentColor }}>
-              <i className="ti ti-send" style={{ fontSize: 13 }} />
-            </div>
+            {(s.aiWarning || !s.removeBranding) && (
+              <div className="chat-footer-meta">
+                {s.aiWarning && (
+                  <div className="chat-ai-warning">
+                    <i className="ti ti-info-circle" style={{ fontSize: 10, flexShrink: 0 }} />
+                    <span>{s.aiWarning}</span>
+                  </div>
+                )}
+                {!s.removeBranding && (
+                  <div className="chat-branding">Powered by CustomGPT.ai</div>
+                )}
+              </div>
+            )}
           </div>
-          {!s.removeBranding && (
-            <div className="chat-branding">Powered by CustomGPT.ai</div>
-          )}
         </div>
-      </div>
+      ) : (
+        <InstructionsPanel
+          value={s.agentInstructions}
+          onChange={v => set("agentInstructions", v)}
+        />
+      )}
     </div>
   );
 }
@@ -971,6 +1056,7 @@ export default function PersonalizePage() {
   const [showPublish, setShowPublish] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
+  const [rightPanel, setRightPanel] = useState<"preview" | "instructions">("preview");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isDirty = dirtyTabs.has(activeTab);
@@ -1060,9 +1146,9 @@ export default function PersonalizePage() {
         {/* Content */}
         <div className="two-col">
           <div className="form-col">
-            {activeTab === "general"      && <GeneralTab s={draft} set={set} />}
+            {activeTab === "general"      && <GeneralSettings s={draft} set={set} />}
             {activeTab === "persona"      && <PlaceholderTab title="Persona" desc="Define your agent's personality, tone, and behavioral guidelines." />}
-            {activeTab === "conversation" && <ConversationTab s={draft} set={set} />}
+            {activeTab === "conversation" && <ConversationSettings s={draft} set={set} />}
             {activeTab === "citations"    && <CitationsTab s={draft} set={set} />}
             {activeTab === "intelligence" && <PlaceholderTab title="Intelligence" desc="Configure AI model, data sources, and reasoning capabilities." />}
             {activeTab === "advanced"     && <AdvancedTab s={draft} set={set} />}
@@ -1070,7 +1156,12 @@ export default function PersonalizePage() {
           </div>
 
           <div className="preview-col">
-            <PreviewPanel s={draft} />
+            <PreviewPanel
+              s={draft}
+              set={set}
+              rightPanel={rightPanel}
+              onRightPanelChange={setRightPanel}
+            />
           </div>
         </div>
 
