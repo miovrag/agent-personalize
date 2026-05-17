@@ -1,9 +1,588 @@
 "use client";
 
 import React, { useState, useCallback, useRef } from "react";
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove, SortableContext, useSortable,
+  verticalListSortingStrategy, sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import StarterQuestions from "@/components/StarterQuestions";
 import GeneralSettings from "@/components/GeneralSettings";
 import ConversationSettings from "@/components/ConversationSettings";
+
+// ─── Child Agent ──────────────────────────────────────────────────────────────
+
+interface ChildAgent {
+  id: string;
+  name: string;
+  role: string;
+  queries: number;
+}
+
+const AVATAR_COLORS = ["#7367F0", "#28C76F", "#FF9F43", "#00CFE8", "#EA5455", "#9C8FFF"];
+
+function agentInitials(name: string) {
+  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?";
+}
+
+function AgentAvatar({ name, index }: { name: string; index: number }) {
+  const bg = AVATAR_COLORS[index % AVATAR_COLORS.length];
+  return (
+    <div style={{
+      width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+      background: bg, display: "flex", alignItems: "center", justifyContent: "center",
+      font: "600 12px/1 var(--cg-font)", color: "#fff",
+    }}>
+      {agentInitials(name)}
+    </div>
+  );
+}
+
+// ─── Confirm Primary Modal ────────────────────────────────────────────────────
+
+function ConfirmPrimaryModal({
+  agentName,
+  onConfirm,
+  onCancel,
+}: {
+  agentName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 300,
+        background: "rgba(23,23,23,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div style={{
+        background: "#FFFFFF", borderRadius: 16,
+        width: "100%", maxWidth: 380,
+        padding: "28px 24px 24px",
+        boxShadow: "0 4px 18px rgba(23,23,23,.08)",
+      }}>
+        {/* Icon */}
+        <div style={{
+          width: 48, height: 48, borderRadius: 12, margin: "0 auto 16px",
+          background: "#EAE8FD",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <i className="ti ti-star" style={{ fontSize: 22, color: "#7367F0" }} />
+        </div>
+
+        {/* Title */}
+        <h3 style={{
+          margin: "0 0 8px", textAlign: "center",
+          font: "600 18px/24px var(--cg-font-sans)", color: "#171717",
+        }}>
+          Set as primary?
+        </h3>
+
+        {/* Body */}
+        <p style={{
+          margin: "0 0 24px", textAlign: "center",
+          font: "400 14px/1.6 var(--cg-font-body)", color: "#737373",
+        }}>
+          <strong style={{ color: "#404040" }}>{agentName}</strong> will become the primary agent and will be shown first to new users.
+        </p>
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1, height: 40, borderRadius: 8,
+              border: "1px solid #E5E5E5", background: "#FFFFFF",
+              font: "500 14px/1 var(--cg-font-sans)", color: "#404040",
+              cursor: "pointer", transition: "border-color 120ms",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, height: 40, borderRadius: 8,
+              border: "none", background: "#7367F0",
+              font: "500 14px/1 var(--cg-font-sans)", color: "#FFFFFF",
+              cursor: "pointer", boxShadow: "0 4px 24px rgba(115,103,240,.35)",
+              transition: "background 120ms",
+            }}
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sortable Build Row ───────────────────────────────────────────────────────
+
+function SortableBuildRow({
+  agent, index, total, onSetPrimary,
+}: {
+  agent: ChildAgent; index: number; total: number; onSetPrimary: () => void;
+}) {
+  const isPrimary = index === 0;
+  const [hovered, setHovered] = useState(false);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: agent.id });
+
+  return (
+    <tr
+      ref={setNodeRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+        background: isDragging ? "#F8F7FA" : hovered ? "#FAFAFA" : "transparent",
+        borderBottom: index < total - 1 ? "1px solid #F3F2F5" : "none",
+      }}
+    >
+      {/* Drag handle */}
+      <td style={{ padding: "14px 4px 14px 16px", width: 28, verticalAlign: "middle" }}>
+        <div
+          {...listeners}
+          {...attributes}
+          aria-label="Drag to reorder"
+          style={{ cursor: isDragging ? "grabbing" : "grab", color: "#C4C4CC", display: "flex", alignItems: "center", touchAction: "none" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="5.5" cy="4"  r="1.3" fill="currentColor"/>
+            <circle cx="5.5" cy="8"  r="1.3" fill="currentColor"/>
+            <circle cx="5.5" cy="12" r="1.3" fill="currentColor"/>
+            <circle cx="10.5" cy="4"  r="1.3" fill="currentColor"/>
+            <circle cx="10.5" cy="8"  r="1.3" fill="currentColor"/>
+            <circle cx="10.5" cy="12" r="1.3" fill="currentColor"/>
+          </svg>
+        </div>
+      </td>
+      {/* Agent name + Primary badge */}
+      <td style={{ padding: "14px 16px 14px 4px", verticalAlign: "middle" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <AgentAvatar name={agent.name} index={index} />
+          <span style={{ font: "400 13px/20px var(--cg-font-body)", color: "#4B465C" }}>
+            {agent.name}
+          </span>
+          {isPrimary && (
+            <span style={{
+              background: "rgba(115,103,240,.12)", color: "#5C53C0",
+              borderRadius: 4, padding: "2px 10px",
+              font: "600 11px/16px var(--cg-font-sans)", flexShrink: 0,
+            }}>
+              Primary
+            </span>
+          )}
+        </div>
+      </td>
+      {/* Queries */}
+      <td style={{ padding: "14px 16px", font: "400 13px/20px var(--cg-font-body)", color: "#4B465C", verticalAlign: "middle" }}>
+        {agent.queries}
+      </td>
+      {/* Actions */}
+      <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {!isPrimary && (
+            <button
+              onClick={onSetPrimary}
+              style={{
+                height: 28, padding: "0 10px", borderRadius: 6,
+                border: "1px solid #E5E5E5", background: "#FFFFFF",
+                font: "500 12px/1 var(--cg-font-sans)", color: "#7367F0",
+                cursor: "pointer", whiteSpace: "nowrap",
+                opacity: hovered ? 1 : 0, transition: "opacity 120ms, border-color 120ms",
+              }}
+            >
+              Set as primary
+            </button>
+          )}
+          <i className="ti ti-settings" style={{ fontSize: 18, cursor: "pointer", color: "#82868B" }} />
+          <i className="ti ti-trash-x" style={{ fontSize: 18, cursor: "pointer", color: "#82868B" }} />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ─── Add Agents Modal ─────────────────────────────────────────────────────────
+
+const AVAILABLE_AGENTS = [
+  { id: "av1", name: "My Customer Support Agent",   disabled: false },
+  { id: "av2", name: "My Customer Support Pro",     disabled: false },
+  { id: "av3", name: "My Website Copilot",          disabled: false },
+  { id: "av4", name: "My Agent",                    disabled: true  },
+  { id: "av5", name: "Град Ниш (2)",                disabled: true  },
+];
+
+function AddAgentsModal({ onClose }: { onClose: () => void }) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const filtered = AVAILABLE_AGENTS.filter((a) =>
+    a.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const toggle = (id: string, disabled: boolean) => {
+    if (disabled) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        background: "rgba(23,23,23,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      {/* Wrapper keeps close button visible outside overflow:hidden modal */}
+      <div style={{ position: "relative", width: "100%", maxWidth: 600 }}>
+        {/* Close — radius-full, shadow-sm, border-default */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute", top: -14, right: -14, zIndex: 10,
+            width: 32, height: 32, borderRadius: 999,
+            background: "#FFFFFF", border: "1px solid #E5E5E5",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 2px 4px rgba(23,23,23,.08)", color: "#171717",
+          }}
+        >
+          <i className="ti ti-x" style={{ fontSize: 16 }} />
+        </button>
+
+        {/* DS modal — radius-xl (16px), bg-surface, shadow-default */}
+        <div style={{
+          background: "#FFFFFF", borderRadius: 16,
+          width: "100%",
+          padding: "28px 24px 24px",
+          boxShadow: "0 4px 18px rgba(23,23,23,.08)",
+          overflow: "hidden",
+        }}>
+
+        {/* Title — text-2xl weight-semibold text-heading */}
+        <h2 style={{
+          margin: "0 0 8px", textAlign: "center",
+          font: "600 24px/32px var(--cg-font-sans)", color: "#171717",
+          letterSpacing: "-0.01em",
+        }}>
+          Add agents to the Multi-Agent
+        </h2>
+
+        {/* Subtitle — text-sm text-body */}
+        <p style={{ margin: "0 0 4px", font: "400 14px/1.6 var(--cg-font-body)", color: "#404040" }}>
+          Please select agents you want to add to this Multi-Agent.
+        </p>
+        {/* Helper — text-sm text-muted */}
+        <p style={{ margin: "0 0 24px", font: "400 14px/1.6 var(--cg-font-body)", color: "#737373" }}>
+          You can add up to 8 agents. If you wish to add more, please{" "}
+          <a href="#" style={{ color: "#7367F0", textDecoration: "none" }}>contact sales</a>.
+        </p>
+
+        {/* Search + filters — spacing-sm (8px) gap, input radius-md (8px), height 40px */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+          <div style={{ flex: 1, position: "relative" }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search"
+              style={{
+                width: "100%", height: 40, padding: "0 40px 0 12px",
+                border: "1px solid #E5E5E5", borderRadius: 8, outline: "none",
+                font: "400 14px/1 var(--cg-font-body)", color: "#171717",
+                background: "#FFFFFF", transition: "border-color 120ms",
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = "#7367F0"; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = "#E5E5E5"; }}
+            />
+            <i className="ti ti-search" style={{
+              position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+              fontSize: 16, color: "#A3A3A3", pointerEvents: "none",
+            }} />
+          </div>
+
+          {/* btn-ghost style dropdowns — radius-md, border-default */}
+          {[
+            { label: "All Time",     icon: "ti-calendar" },
+            { label: "Newest First", icon: null           },
+          ].map(({ label, icon }) => (
+            <button key={label} style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              height: 40, padding: "0 12px", borderRadius: 8,
+              border: "1px solid #E5E5E5", background: "#FFFFFF", cursor: "pointer",
+              font: "500 14px/1 var(--cg-font-sans)", color: "#404040",
+              transition: "border-color 120ms",
+            }}>
+              {icon && <i className={`ti ${icon}`} style={{ fontSize: 15, color: "#737373" }} />}
+              {label}
+              <i className="ti ti-chevron-down" style={{ fontSize: 14, color: "#737373" }} />
+            </button>
+          ))}
+        </div>
+
+        {/* Agent cards grid — spacing-sm (8px) gap, radius-md cards */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8,
+          minHeight: 160, marginBottom: 24,
+        }}>
+          {filtered.map((agent, i) => {
+            const isSelected = selected.has(agent.id);
+            return (
+              <button
+                key={agent.id}
+                onClick={() => toggle(agent.id, agent.disabled)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "12px",
+                  border: `1px solid ${isSelected ? "#7367F0" : "#E5E5E5"}`,
+                  borderRadius: 8,
+                  background: isSelected ? "#EAE8FD" : "#FFFFFF",
+                  cursor: agent.disabled ? "default" : "pointer",
+                  textAlign: "left", opacity: agent.disabled ? 0.45 : 1,
+                  transition: "border-color 120ms, background 120ms",
+                }}
+              >
+                {/* Avatar — 28px in modal context */}
+                <div style={{ flexShrink: 0, width: 28, height: 28, borderRadius: "50%",
+                  background: AVATAR_COLORS[i % AVATAR_COLORS.length],
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  font: "600 10px/1 var(--cg-font-sans)", color: "#fff" }}>
+                  {agentInitials(agent.name)}
+                </div>
+                {/* Name — text-sm text-body */}
+                <span style={{
+                  font: "500 13px/18px var(--cg-font-sans)",
+                  color: "#404040",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  flex: 1,
+                }}>
+                  {agent.name}
+                </span>
+                {/* Checkbox — radius-sm (4px) */}
+                <div style={{
+                  width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                  border: `1.5px solid ${isSelected ? "#7367F0" : "#D4D4D4"}`,
+                  background: isSelected ? "#7367F0" : "#FFFFFF",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "border-color 120ms, background 120ms",
+                }}>
+                  {isSelected && <i className="ti ti-check" style={{ fontSize: 10, color: "#fff" }} />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* CTA — btn-primary, radius-md, height 40px */}
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <button
+            disabled={selected.size === 0}
+            style={{
+              height: 40, padding: "0 24px", borderRadius: 8,
+              border: "none", cursor: selected.size === 0 ? "not-allowed" : "pointer",
+              background: selected.size === 0 ? "#DBDADE" : "#7367F0",
+              color: selected.size === 0 ? "#A3A3A3" : "#FFFFFF",
+              font: "500 14px/1 var(--cg-font-sans)",
+              boxShadow: selected.size > 0 ? "0 4px 24px rgba(115,103,240,.35)" : "none",
+              transition: "background 120ms, box-shadow 120ms",
+            }}
+          >
+            Create Multi-Agent
+          </button>
+        </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Build Page ───────────────────────────────────────────────────────────────
+
+function BuildPage({
+  agents,
+  onReorder,
+  agentName,
+  onPublish,
+}: {
+  agents: ChildAgent[];
+  onReorder: (agents: ChildAgent[]) => void;
+  agentName: string;
+  onPublish: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [confirmPrimary, setConfirmPrimary] = useState<{ name: string; execute: () => void } | null>(null);
+  const filtered = agents.filter(
+    (a) =>
+      a.name.toLowerCase().includes(search.toLowerCase()) ||
+      a.role.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = agents.findIndex((a) => a.id === active.id);
+    const newIndex = agents.findIndex((a) => a.id === over.id);
+    if (oldIndex === newIndex) return;
+
+    if (newIndex === 0 || oldIndex === 0) {
+      // Primary slot changes — ask for confirmation
+      const newPrimary = newIndex === 0 ? agents[oldIndex] : agents[1];
+      setConfirmPrimary({
+        name: newPrimary.name,
+        execute: () => onReorder(arrayMove(agents, oldIndex, newIndex)),
+      });
+    } else {
+      onReorder(arrayMove(agents, oldIndex, newIndex));
+    }
+  }, [agents, onReorder]);
+
+  return (
+    <div className="main">
+      {/* Page header */}
+      <header className="page-header">
+        <div className="page-header-top">
+          <div className="page-title">
+            Build &bull; {agentName || "My Multi-Agent"} &bull; Agents
+          </div>
+          <button className="cg-btn cg-btn-primary cg-btn-lg" onClick={onPublish}>
+            <i className="ti ti-rocket" style={{ fontSize: 16 }} />
+            Publish
+          </button>
+        </div>
+
+      </header>
+
+      {/* Search + Add */}
+      <div style={{ margin: "0 28px", display: "flex", gap: 12, alignItems: "stretch" }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search"
+            style={{
+              width: "100%", height: 44, padding: "0 44px 0 16px",
+              border: "1px solid #DBDADE", borderRadius: 8,
+              background: "#fff", outline: "none",
+              font: "400 15px/24px var(--cg-font-body)", color: "#21231E",
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = "#7367F0"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(115,103,240,.16)"; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = "#DBDADE"; e.currentTarget.style.boxShadow = "none"; }}
+          />
+          <i className="ti ti-search" style={{
+            position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
+            fontSize: 18, color: "#9AA7A3", pointerEvents: "none",
+          }} />
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            height: 44, padding: "0 20px", borderRadius: 8, border: "none", cursor: "pointer",
+            background: "#7367F0", color: "#fff",
+            font: "500 15px/20px var(--cg-font-sans)", whiteSpace: "nowrap",
+            boxShadow: "0 2px 6px rgba(115,103,240,.35)",
+          }}
+        >
+          <i className="ti ti-plus" style={{ fontSize: 18 }} />
+          Add Agents
+        </button>
+      </div>
+
+      {/* Add Agents modal */}
+      {showAddModal && <AddAgentsModal onClose={() => setShowAddModal(false)} />}
+
+      {/* Agents table */}
+      <div style={{
+        margin: "16px 28px 32px",
+        border: "1px solid #EBE9F1", borderRadius: 6,
+        background: "#fff", overflow: "hidden",
+        boxShadow: "0 4px 24px rgba(75,70,92,.06)",
+      }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#F8F7FA" }}>
+              {/* drag handle column — no header */}
+              <th style={{ width: 44, borderBottom: "1px solid #EBE9F1" }} />
+              {["AGENT NAME", "QUERIES (THIS BILLING CYCLE)", "ACTIONS"].map((h) => (
+                <th key={h} style={{
+                  textAlign: "left", padding: "12px 16px",
+                  font: "600 12px/16px var(--cg-font-sans)", color: "#82868B",
+                  letterSpacing: ".06em", textTransform: "uppercase",
+                  borderBottom: "1px solid #EBE9F1", whiteSpace: "nowrap",
+                }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={agents.map((a) => a.id)} strategy={verticalListSortingStrategy}>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{
+                      padding: "40px 16px", textAlign: "center",
+                      font: "400 13px/20px var(--cg-font-body)", color: "#82868B",
+                    }}>
+                      {search ? "No agents match your search." : "No agents added yet."}
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((agent, i) => (
+                    <SortableBuildRow
+                      key={agent.id}
+                      agent={agent}
+                      index={agents.findIndex((a) => a.id === agent.id)}
+                      total={agents.length}
+                      onSetPrimary={() => {
+                        const idx = agents.findIndex((a) => a.id === agent.id);
+                        setConfirmPrimary({
+                          name: agent.name,
+                          execute: () => onReorder(arrayMove(agents, idx, 0)),
+                        });
+                      }}
+                    />
+                  ))
+                )}
+              </tbody>
+            </SortableContext>
+          </DndContext>
+        </table>
+      </div>
+
+      {confirmPrimary && (
+        <ConfirmPrimaryModal
+          agentName={confirmPrimary.name}
+          onConfirm={() => { confirmPrimary.execute(); setConfirmPrimary(null); }}
+          onCancel={() => setConfirmPrimary(null)}
+        />
+      )}
+    </div>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -998,34 +1577,136 @@ function PublishModal({ s, onClose, onPublish }: { s: Settings; onClose: () => v
   );
 }
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
+// ─── DS Left Panel ────────────────────────────────────────────────────────────
 
-function AppSidebar() {
-  const items = [
-    { icon: "chart-donut", active: false },
-    { icon: "robot", active: true },
-    { icon: "messages", active: false },
-    { icon: "books", active: false },
-    { icon: "world", active: false },
-    { icon: "users", active: false },
-  ];
+const AGENT_NAV = [
+  { id: "build",       label: "Build",       icon: "hammer"    },
+  { id: "personalize", label: "Personalize", icon: "brush"     },
+  { id: "ask",         label: "Ask",         icon: "message-2", stub: true },
+  { id: "deploy",      label: "Deploy",      icon: "rocket",    stub: true },
+];
+
+function DSLeftPanel({
+  agentName,
+  pageView,
+  onPageChange,
+}: {
+  agentName: string;
+  pageView: string;
+  onPageChange: (v: string) => void;
+}) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-logo">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="CustomGPT" width={28} height={28} />
+    <aside style={{
+      width: 260, flexShrink: 0,
+      background: "#fff",
+      borderRight: "1px solid #EBE9F1",
+      display: "flex", flexDirection: "column",
+      position: "sticky", top: 0, height: "100vh",
+    }}>
+      {/* Header */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "20px 20px 16px", borderBottom: "1px solid #F3F2F5",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="CustomGPT" style={{ width: 28, height: 28 }} />
+          <span style={{ font: "700 18px/24px var(--cg-font-sans)", color: "#21231E", letterSpacing: ".2px" }}>
+            CustomGPT
+          </span>
+        </div>
+        <button style={{ color: "#82868B", padding: 0, lineHeight: 0 }}>
+          <i className="ti ti-layout-grid" style={{ fontSize: 18 }} />
+        </button>
       </div>
-      {items.map((item, i) => (
-        <div key={i} className={`sidebar-item ${item.active ? "active" : ""}`}>
-          <i className={`ti ti-${item.icon}`} style={{ fontSize: 20 }} />
+
+      {/* New Agent button */}
+      <div style={{ padding: "16px 12px 0" }}>
+        <button style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 8, height: 40, borderRadius: 8, border: "none", cursor: "pointer",
+          background: "#7367F0", color: "#fff",
+          font: "600 14px/1 var(--cg-font-sans)",
+          boxShadow: "0 2px 6px rgba(115,103,240,.35)",
+        }}>
+          <i className="ti ti-plus" style={{ fontSize: 16 }} />
+          New Agent
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav style={{ flex: 1, overflowY: "auto", padding: "12px 12px 0" }}>
+        {/* Agent context back */}
+        <button style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 12px", margin: "0 0 4px", borderRadius: 6,
+          background: "transparent", border: "none", cursor: "pointer",
+          color: "#4B465C", font: "500 15px/20px var(--cg-font-sans)", textAlign: "left",
+        }}>
+          <i className="ti ti-chevron-left" style={{ fontSize: 18, opacity: 0.5, flexShrink: 0 }} />
+          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {agentName || "My Multi-Agent"}
+          </span>
+        </button>
+
+        {/* Agent pages */}
+        {AGENT_NAV.map((item) => {
+          const isActive = pageView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => !item.stub && onPageChange(item.id)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 12,
+                padding: "10px 12px", margin: "2px 0", borderRadius: 6, border: "none",
+                cursor: item.stub ? "default" : "pointer",
+                background: isActive ? "linear-gradient(118deg,#7367F0,#9E95F5)" : "transparent",
+                color: isActive ? "#fff" : item.stub ? "#82868B" : "#4B465C",
+                boxShadow: isActive ? "0 2px 6px rgba(115,103,240,.35)" : "none",
+                font: "500 15px/20px var(--cg-font-sans)",
+                transition: "background .12s, color .12s",
+              }}
+              onMouseEnter={(e) => { if (!isActive && !item.stub) e.currentTarget.style.background = "rgba(75,70,92,.04)"; }}
+              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+            >
+              <i className={`ti ti-${item.icon}`} style={{ fontSize: 20, flexShrink: 0 }} />
+              <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+              {item.stub && (
+                <span style={{
+                  background: "rgba(75,70,92,.08)", color: "#82868B",
+                  borderRadius: 4, padding: "2px 8px",
+                  font: "600 10px/14px var(--cg-font-sans)",
+                }}>
+                  Soon
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Copilot */}
+      <div style={{ padding: "16px", borderTop: "1px solid #F3F2F5" }}>
+        <div style={{
+          font: "600 11px/16px var(--cg-font-sans)", color: "#82868B",
+          letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8,
+        }}>
+          CustomGPT.ai Copilot
         </div>
-      ))}
-      <div style={{ marginTop: "auto" }}>
-        <div className="sidebar-item">
-          <i className="ti ti-settings" style={{ fontSize: 20 }} />
-        </div>
-        <div className="sidebar-item">
-          <i className="ti ti-user-circle" style={{ fontSize: 20 }} />
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "8px 10px", borderRadius: 8,
+          border: "1px solid #EBE9F1", background: "#F8F7FA",
+        }}>
+          <input
+            placeholder="I need help with..."
+            style={{
+              flex: 1, border: "none", background: "transparent",
+              font: "400 13px/18px var(--cg-font-body)", color: "#4B465C",
+              outline: "none",
+            }}
+          />
+          <i className="ti ti-send-2" style={{ fontSize: 15, color: "#7367F0", cursor: "pointer" }} />
         </div>
       </div>
     </aside>
@@ -1048,7 +1729,17 @@ const ACTIVE_TABS = TABS.filter(t => !t.stub).map(t => t.id);
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+const INITIAL_AGENTS: ChildAgent[] = [
+  { id: "a1", name: "Onboarding Agent",    role: "Lead Generation",   queries: 1842 },
+  { id: "a2", name: "Technical Support",   role: "Customer Support",  queries: 3417 },
+  { id: "a3", name: "Billing Assistant",   role: "Customer Support",  queries: 964  },
+  { id: "a4", name: "Knowledge Base",      role: "Enterprise Search", queries: 7283 },
+  { id: "a5", name: "Sales Copilot",       role: "Lead Generation",   queries: 512  },
+];
+
 export default function PersonalizePage() {
+  const [pageView, setPageView] = useState<string>("build");
+  const [childAgents, setChildAgents] = useState<ChildAgent[]>(INITIAL_AGENTS);
   const [activeTab, setActiveTab] = useState("general");
   const [draft, setDraft] = useState<Settings>({ ...DEFAULTS });
   const [savedTabs, setSavedTabs] = useState<Set<string>>(new Set());
@@ -1090,8 +1781,24 @@ export default function PersonalizePage() {
 
   return (
     <div className="app-shell">
-      <AppSidebar />
+      <DSLeftPanel
+        agentName={draft.agentName || "My Multi-Agent"}
+        pageView={pageView}
+        onPageChange={setPageView}
+      />
 
+      {/* Build view */}
+      {pageView === "build" && (
+        <BuildPage
+          agents={childAgents}
+          onReorder={setChildAgents}
+          agentName={draft.agentName || "My Multi-Agent"}
+          onPublish={() => setShowPublish(true)}
+        />
+      )}
+
+      {/* Personalize view */}
+      {pageView === "personalize" && (
       <div className="main">
         {/* Page header */}
         <header className="page-header">
@@ -1187,6 +1894,7 @@ export default function PersonalizePage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Publish modal */}
       {showPublish && <PublishModal s={draft} onClose={() => setShowPublish(false)} onPublish={handlePublish} />}

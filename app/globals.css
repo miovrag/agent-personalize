@@ -128,7 +128,7 @@ body { font: 400 14px/20px var(--cg-font); color: var(--cg-fg-2); background: va
 
 /* Main content */
 .main {
-  margin-left: var(--cg-sidebar-collapsed);
+  margin-left: 0;
   flex: 1;
   min-width: 0;
   display: flex;
