@@ -137,8 +137,7 @@ body { font: 400 14px/20px var(--cg-font); color: var(--cg-fg-2); background: va
 
 /* Page header */
 .page-header {
-  background: var(--cg-bg-card);
-  border-bottom: 1px solid var(--cg-divider);
+  background: var(--cg-bg-body);
   position: sticky;
   top: 0;
   z-index: 30;
