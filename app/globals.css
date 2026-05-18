@@ -150,13 +150,14 @@ body { font: 400 14px/20px var(--cg-font); color: var(--cg-fg-2); background: va
   padding: 16px 0;
 }
 .page-title {
-  font: 600 18px/24px var(--cg-font);
+  font: 700 24px/1.2 var(--cg-font);
   color: var(--cg-fg-1);
+  letter-spacing: -0.01em;
 }
 .page-subtitle {
-  font: 400 12px/16px var(--cg-font);
+  font: 400 14px/1.4 var(--cg-font);
   color: var(--cg-fg-3);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 /* Tab nav */
