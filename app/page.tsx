@@ -1853,7 +1853,7 @@ export default function PersonalizePage() {
         {/* Content */}
         <div className="two-col">
           <div className="form-col">
-            {activeTab === "general"      && <GeneralSettings s={draft} set={set} />}
+            {activeTab === "general"      && <GeneralSettings s={draft} set={set} childAgents={childAgents} onReorderChildAgents={setChildAgents} />}
             {activeTab === "persona"      && <PlaceholderTab title="Persona" desc="Define your agent's personality, tone, and behavioral guidelines." />}
             {activeTab === "conversation" && <ConversationSettings s={draft} set={set} />}
             {activeTab === "citations"    && <CitationsTab s={draft} set={set} />}

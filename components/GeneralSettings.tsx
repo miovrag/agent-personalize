@@ -1,6 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove, SortableContext, useSortable,
+  verticalListSortingStrategy, sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const AGENT_ROLE_OPTIONS = [
   { value: "enterprise-search", label: "Enterprise Search" },
@@ -23,10 +32,37 @@ export interface GeneralSettingsFields {
   backgroundColor: string;
 }
 
+export interface ChildAgent {
+  id: string;
+  name: string;
+  role: string;
+  queries: number;
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
 const SettingsIcon = () => (
   <svg width="15" height="15" viewBox="0 0 16 16" fill="none" className="shrink-0" style={{ color: "var(--cg-fg-4)" }}>
     <path d="M8 1l1.2 2.6 2.8.4-2 2 .5 2.8L8 7.5 5.5 8.8 6 6 4 4l2.8-.4L8 1z" fill="currentColor" opacity="0.5" stroke="currentColor" strokeWidth="1" strokeLinejoin="round"/>
   </svg>
+);
+
+const DragHandle = ({ listeners, attributes }: { listeners?: object; attributes?: object }) => (
+  <div
+    {...listeners}
+    {...attributes}
+    aria-label="Drag to reorder"
+    style={{ cursor: "grab", color: "#C4C4CC", display: "flex", alignItems: "center", padding: "0 2px", touchAction: "none", flexShrink: 0 }}
+  >
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <circle cx="5.5" cy="4"  r="1.3" fill="currentColor"/>
+      <circle cx="5.5" cy="8"  r="1.3" fill="currentColor"/>
+      <circle cx="5.5" cy="12" r="1.3" fill="currentColor"/>
+      <circle cx="10.5" cy="4"  r="1.3" fill="currentColor"/>
+      <circle cx="10.5" cy="8"  r="1.3" fill="currentColor"/>
+      <circle cx="10.5" cy="12" r="1.3" fill="currentColor"/>
+    </svg>
+  </div>
 );
 
 function InfoIcon({ tooltip }: { tooltip?: string }) {
@@ -46,7 +82,7 @@ function InfoIcon({ tooltip }: { tooltip?: string }) {
         <div style={{
           position: "absolute", bottom: "calc(100% + 6px)", left: "50%",
           transform: "translateX(-50%)", zIndex: 50, pointerEvents: "none",
-          opacity: show ? 1 : 0, transition: "opacity 120ms, transform 120ms",
+          opacity: show ? 1 : 0, transition: "opacity 120ms",
           translate: show ? "0 0" : "0 4px",
         }}>
           <div style={{
@@ -135,14 +171,175 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
+// ─── Sortable Child Agent Card ────────────────────────────────────────────────
+
+function SortableChildAgentCard({
+  agent, index, onSetPrimary,
+}: {
+  agent: ChildAgent; index: number; onSetPrimary: () => void;
+}) {
+  const isPrimary = index === 0;
+  const [hovered, setHovered] = useState(false);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 14px",
+        borderRadius: 10,
+        border: `1.5px solid ${isPrimary ? "var(--cg-primary)" : "var(--cg-border)"}`,
+        background: isPrimary ? "rgba(115,103,240,.05)" : "#fff",
+        boxShadow: isDragging ? "0 4px 16px rgba(0,0,0,.10)" : "none",
+        cursor: "default",
+        transition: `border-color 140ms, background 140ms, ${transition ?? ""}`,
+      }}
+    >
+      <DragHandle listeners={listeners} attributes={attributes} />
+
+      {/* Number circle */}
+      <div style={{
+        width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+        background: isPrimary ? "var(--cg-primary)" : "transparent",
+        border: `2px solid ${isPrimary ? "var(--cg-primary)" : "#D1D1DB"}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        font: `600 12px/1 var(--cg-font)`,
+        color: isPrimary ? "#fff" : "#9CA3AF",
+        transition: "all 140ms",
+      }}>
+        {index + 1}
+      </div>
+
+      {/* Name + role */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ font: "600 13px/18px var(--cg-font)", color: "var(--cg-fg-1)", whiteSpace: "nowrap" }}>
+            {agent.name}
+          </span>
+          {isPrimary && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              background: "rgba(115,103,240,.12)", color: "var(--cg-primary)",
+              borderRadius: 4, padding: "2px 8px",
+              font: "600 11px/16px var(--cg-font)", flexShrink: 0,
+            }}>
+              ★ Primary
+            </span>
+          )}
+        </div>
+        <div style={{ font: "400 11px/16px var(--cg-font)", color: "var(--cg-fg-4)", marginTop: 2 }}>
+          {agent.role}
+        </div>
+      </div>
+
+      {/* Set as primary — hover only */}
+      {!isPrimary && (
+        <button
+          onClick={onSetPrimary}
+          style={{
+            height: 28, padding: "0 10px", borderRadius: 6,
+            border: "1px solid var(--cg-border)", background: "#fff",
+            font: "500 12px/1 var(--cg-font)", color: "var(--cg-primary)",
+            cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+            opacity: hovered ? 1 : 0,
+            transition: "opacity 120ms",
+          }}
+        >
+          Set as primary
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Child Agents Section ─────────────────────────────────────────────────────
+
+function ChildAgentsSection({
+  agents,
+  onReorder,
+}: {
+  agents: ChildAgent[];
+  onReorder: (agents: ChildAgent[]) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = agents.findIndex((a) => a.id === active.id);
+    const newIndex = agents.findIndex((a) => a.id === over.id);
+    onReorder(arrayMove(agents, oldIndex, newIndex));
+  };
+
+  const handleSetPrimary = (id: string) => {
+    const idx = agents.findIndex((a) => a.id === id);
+    if (idx > 0) onReorder(arrayMove(agents, idx, 0));
+  };
+
+  return (
+    <div style={{ padding: "18px 0", borderBottom: "1px solid var(--cg-divider)" }}>
+      {/* Section header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <SettingsIcon />
+        <span style={{ font: "600 13px/18px var(--cg-font)", color: "var(--cg-fg-1)" }}>Child Agents</span>
+        <InfoIcon tooltip="Child agents are the individual agents that make up this multi-agent. The first agent is the primary — it receives every user message and decides how to route or respond." />
+      </div>
+      <p style={{ font: "400 12px/18px var(--cg-font)", color: "var(--cg-fg-4)", marginBottom: 14 }}>
+        Drag or click <em>Set as primary</em> to reorder. First in the list is primary.
+      </p>
+
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={agents.map((a) => a.id)} strategy={verticalListSortingStrategy}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {agents.map((agent, i) => (
+              <SortableChildAgentCard
+                key={agent.id}
+                agent={agent}
+                index={i}
+                onSetPrimary={() => handleSetPrimary(agent.id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      {/* Footer divider */}
+      {agents.length > 1 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, marginTop: 14,
+        }}>
+          <div style={{ flex: 1, height: 1, background: "var(--cg-divider)" }} />
+          <span style={{ font: "400 11px/16px var(--cg-font)", color: "var(--cg-fg-4)", whiteSpace: "nowrap" }}>
+            Primary above · Others below
+          </span>
+          <div style={{ flex: 1, height: 1, background: "var(--cg-divider)" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function GeneralSettings({
   s,
   set,
+  childAgents,
+  onReorderChildAgents,
 }: {
   s: GeneralSettingsFields;
   set: (k: keyof GeneralSettingsFields, v: unknown) => void;
+  childAgents?: ChildAgent[];
+  onReorderChildAgents?: (agents: ChildAgent[]) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -233,6 +430,11 @@ export default function GeneralSettings({
         </div>
       </div>
       </div>
+
+      {/* Child Agents — shown only when agents are provided */}
+      {childAgents && childAgents.length > 0 && onReorderChildAgents && (
+        <ChildAgentsSection agents={childAgents} onReorder={onReorderChildAgents} />
+      )}
 
       {/* Agent Color Scheme */}
       <Section label="Agent Color Scheme" info>
