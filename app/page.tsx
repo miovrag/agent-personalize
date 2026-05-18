@@ -513,6 +513,7 @@ function BuildPage({
       {showAddModal && <AddAgentsModal onClose={() => setShowAddModal(false)} />}
 
       {/* Agents table */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <div style={{
         margin: "0 28px 32px",
         border: "1px solid #EBE9F1", borderRadius: 6,
@@ -536,8 +537,7 @@ function BuildPage({
               ))}
             </tr>
           </thead>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={agents.map((a) => a.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={agents.map((a) => a.id)} strategy={verticalListSortingStrategy}>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
@@ -566,10 +566,10 @@ function BuildPage({
                   ))
                 )}
               </tbody>
-            </SortableContext>
-          </DndContext>
+          </SortableContext>
         </table>
       </div>
+      </DndContext>
 
       {confirmPrimary && (
         <ConfirmPrimaryModal
