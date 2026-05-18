@@ -179,7 +179,7 @@ function SortableBuildRow({
       </td>
       {/* Actions */}
       <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {!isPrimary && (
             <button
               onClick={onSetPrimary}
@@ -194,8 +194,21 @@ function SortableBuildRow({
               Set as primary
             </button>
           )}
-          <i className="ti ti-settings" style={{ fontSize: 18, cursor: "pointer", color: "#82868B" }} />
-          <i className="ti ti-trash-x" style={{ fontSize: 18, cursor: "pointer", color: "#82868B" }} />
+          {(["ti-refresh", "ti-clipboard-x", "ti-clipboard-list", "ti-layout-list"] as const).map((icon) => (
+            <button
+              key={icon}
+              style={{
+                width: 28, height: 28, borderRadius: 6,
+                border: "none", background: "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", color: "#82868B",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#F3F2F5"; (e.currentTarget as HTMLButtonElement).style.color = "#4B465C"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#82868B"; }}
+            >
+              <i className={`ti ${icon}`} style={{ fontSize: 17 }} />
+            </button>
+          ))}
         </div>
       </td>
     </tr>
