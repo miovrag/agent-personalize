@@ -147,7 +147,7 @@ body { font: 400 14px/20px var(--cg-font); color: var(--cg-fg-2); background: va
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0 12px;
+  padding: 16px 0;
 }
 .page-title {
   font: 600 18px/24px var(--cg-font);

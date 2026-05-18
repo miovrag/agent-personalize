@@ -475,7 +475,7 @@ function BuildPage({
       </header>
 
       {/* Search + Add */}
-      <div style={{ margin: "0 28px", display: "flex", gap: 12, alignItems: "stretch" }}>
+      <div style={{ margin: "0 28px 16px", display: "flex", gap: 12, alignItems: "stretch" }}>
         <div style={{ flex: 1, position: "relative" }}>
           <input
             value={search}
@@ -514,7 +514,7 @@ function BuildPage({
 
       {/* Agents table */}
       <div style={{
-        margin: "16px 28px 32px",
+        margin: "0 28px 32px",
         border: "1px solid #EBE9F1", borderRadius: 6,
         background: "#fff", overflow: "hidden",
         boxShadow: "0 4px 24px rgba(75,70,92,.06)",
