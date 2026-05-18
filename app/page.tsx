@@ -55,68 +55,65 @@ function ConfirmPrimaryModal({
 }) {
   return (
     <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 300,
-        background: "rgba(23,23,23,0.5)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 24,
-      }}
+      className="modal-backdrop"
+      style={{ zIndex: 300 }}
       onClick={(e) => e.target === e.currentTarget && onCancel()}
     >
-      <div style={{
-        background: "#FFFFFF", borderRadius: 16,
-        width: "100%", maxWidth: 380,
-        padding: "28px 24px 24px",
-        boxShadow: "0 4px 18px rgba(23,23,23,.08)",
-      }}>
+      <div
+        className="modal-card"
+        style={{ maxWidth: 440, position: "relative" }}
+      >
+        {/* Close */}
+        <button
+          onClick={onCancel}
+          style={{
+            position: "absolute", top: 16, right: 16,
+            width: 32, height: 32, borderRadius: "var(--cg-radius-full)",
+            border: "1px solid var(--cg-divider)",
+            background: "var(--cg-bg-card)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", color: "var(--cg-fg-3)",
+            transition: "color var(--cg-dur-fast), border-color var(--cg-dur-fast)",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--cg-fg-1)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--cg-border)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--cg-fg-3)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--cg-divider)"; }}
+        >
+          <i className="ti ti-x" style={{ fontSize: 14 }} />
+        </button>
+
         {/* Icon */}
         <div style={{
-          width: 48, height: 48, borderRadius: 12, margin: "0 auto 16px",
-          background: "#EAE8FD",
+          width: 48, height: 48,
+          borderRadius: "var(--cg-radius-md)",
+          background: "var(--cg-primary-100)",
           display: "flex", alignItems: "center", justifyContent: "center",
+          margin: "24px auto 16px",
         }}>
-          <i className="ti ti-star" style={{ fontSize: 22, color: "#7367F0" }} />
+          <i className="ti ti-star" style={{ fontSize: 22, color: "var(--cg-primary)" }} />
         </div>
 
         {/* Title */}
         <h3 style={{
           margin: "0 0 8px", textAlign: "center",
-          font: "600 18px/24px var(--cg-font-sans)", color: "#171717",
+          font: "600 18px/24px var(--cg-font)", color: "var(--cg-fg-1)",
         }}>
           Set as primary?
         </h3>
 
         {/* Body */}
         <p style={{
-          margin: "0 0 24px", textAlign: "center",
-          font: "400 14px/1.6 var(--cg-font-body)", color: "#737373",
+          margin: "0 0 24px", textAlign: "center", padding: "0 24px",
+          font: "400 14px/1.6 var(--cg-font)", color: "var(--cg-fg-3)",
         }}>
-          <strong style={{ color: "#404040" }}>{agentName}</strong> will become the primary agent and will be shown first to new users.
+          <strong style={{ color: "var(--cg-fg-2)" }}>{agentName}</strong> will become the primary agent and will be shown first to new users.
         </p>
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1, height: 40, borderRadius: 8,
-              border: "1px solid #E5E5E5", background: "#FFFFFF",
-              font: "500 14px/1 var(--cg-font-sans)", color: "#404040",
-              cursor: "pointer", transition: "border-color 120ms",
-            }}
-          >
+        <div className="modal-ft" style={{ borderTop: "1px solid var(--cg-divider)" }}>
+          <button className="cg-btn cg-btn-neutral" onClick={onCancel}>
             Cancel
           </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              flex: 1, height: 40, borderRadius: 8,
-              border: "none", background: "#7367F0",
-              font: "500 14px/1 var(--cg-font-sans)", color: "#FFFFFF",
-              cursor: "pointer", boxShadow: "0 4px 24px rgba(115,103,240,.35)",
-              transition: "background 120ms",
-            }}
-          >
+          <button className="cg-btn cg-btn-primary" onClick={onConfirm}>
             Confirm
           </button>
         </div>
