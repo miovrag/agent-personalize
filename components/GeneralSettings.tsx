@@ -238,22 +238,35 @@ function SortableChildAgentCard({
         </div>
       </div>
 
-      {/* Set as primary — hover only */}
-      {!isPrimary && (
-        <button
-          onClick={onSetPrimary}
-          style={{
-            height: 28, padding: "0 10px", borderRadius: 6,
-            border: "1px solid var(--cg-border)", background: "#fff",
-            font: "500 12px/1 var(--cg-font)", color: "var(--cg-primary)",
-            cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
-            opacity: hovered ? 1 : 0,
-            transition: "opacity 120ms",
-          }}
-        >
-          Set as primary
-        </button>
-      )}
+      {/* Action icons — hover only */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 2, flexShrink: 0,
+        opacity: hovered ? 1 : 0, transition: "opacity 120ms",
+      }}>
+        {[
+          { icon: "ti-refresh",        title: "Refresh",       onClick: () => {} },
+          { icon: "ti-clipboard-x",    title: "Remove",        onClick: () => {} },
+          { icon: "ti-clipboard-list", title: "View details",  onClick: () => {} },
+          { icon: "ti-layout-list",    title: "Configure",     onClick: !isPrimary ? onSetPrimary : () => {} },
+        ].map(({ icon, title, onClick }) => (
+          <button
+            key={icon}
+            title={title}
+            onClick={onClick}
+            style={{
+              width: 28, height: 28, borderRadius: 6,
+              border: "none", background: "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: "var(--cg-fg-3)",
+              transition: "color 120ms, background 120ms",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--cg-bg-2)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--cg-fg-1)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "var(--cg-fg-3)"; }}
+          >
+            <i className={`ti ${icon}`} style={{ fontSize: 16 }} />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
