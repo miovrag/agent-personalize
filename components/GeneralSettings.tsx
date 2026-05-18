@@ -51,6 +51,7 @@ const DragHandle = ({ listeners, attributes }: { listeners?: object; attributes?
   <div
     {...listeners}
     {...attributes}
+    suppressHydrationWarning
     aria-label="Drag to reorder"
     style={{ cursor: "grab", color: "#C4C4CC", display: "flex", alignItems: "center", padding: "0 2px", touchAction: "none", flexShrink: 0 }}
   >

@@ -141,6 +141,7 @@ function SortableBuildRow({
         <div
           {...listeners}
           {...attributes}
+          suppressHydrationWarning
           aria-label="Drag to reorder"
           style={{ cursor: isDragging ? "grabbing" : "grab", color: "#C4C4CC", display: "flex", alignItems: "center", touchAction: "none" }}
         >
