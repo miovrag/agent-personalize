@@ -81,20 +81,9 @@ function ConfirmPrimaryModal({
           <i className="ti ti-x" style={{ fontSize: 14 }} />
         </button>
 
-        {/* Icon */}
-        <div style={{
-          width: 48, height: 48,
-          borderRadius: "var(--cg-radius-md)",
-          background: "var(--cg-primary-100)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "24px auto 16px",
-        }}>
-          <i className="ti ti-star" style={{ fontSize: 22, color: "var(--cg-primary)" }} />
-        </div>
-
         {/* Title */}
         <h3 style={{
-          margin: "0 0 8px", textAlign: "center",
+          margin: "24px 0 8px", textAlign: "center",
           font: "600 18px/24px var(--cg-font)", color: "var(--cg-fg-1)",
         }}>
           Set as primary?
