@@ -190,7 +190,7 @@ function SortableChildAgentCard({
       onMouseLeave={() => setHovered(false)}
       style={{
         transform: CSS.Transform.toString(transform),
-        transition,
+        transition: `border-color 140ms, background 140ms, ${transition ?? ""}`,
         opacity: isDragging ? 0.4 : 1,
         display: "flex", alignItems: "center", gap: 10,
         padding: "12px 14px",
@@ -199,7 +199,6 @@ function SortableChildAgentCard({
         background: isPrimary ? "rgba(115,103,240,.05)" : "#fff",
         boxShadow: isDragging ? "0 4px 16px rgba(0,0,0,.10)" : "none",
         cursor: "default",
-        transition: `border-color 140ms, background 140ms, ${transition ?? ""}`,
       }}
     >
       <DragHandle listeners={listeners} attributes={attributes} />
