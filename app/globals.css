@@ -358,7 +358,6 @@ body { font: 400 14px/20px var(--cg-font); color: var(--cg-fg-2); background: va
   background: var(--cg-primary);
   color: #fff;
   border-color: var(--cg-primary);
-  box-shadow: var(--cg-primary-shadow);
 }
 .cg-btn-primary:hover { background: var(--cg-primary-hover); border-color: var(--cg-primary-hover); }
 .cg-btn-primary:active { background: var(--cg-primary-active); transform: scale(0.98); }

@@ -386,8 +386,7 @@ function AddAgentsModal({ onClose }: { onClose: () => void }) {
               background: selected.size === 0 ? "#DBDADE" : "#7367F0",
               color: selected.size === 0 ? "#A3A3A3" : "#FFFFFF",
               font: "500 14px/1 var(--cg-font-sans)",
-              boxShadow: selected.size > 0 ? "0 4px 24px rgba(115,103,240,.35)" : "none",
-              transition: "background 120ms, box-shadow 120ms",
+              transition: "background 120ms",
             }}
           >
             Create Multi-Agent
@@ -489,7 +488,6 @@ function BuildPage({
             height: 44, padding: "0 20px", borderRadius: 8, border: "none", cursor: "pointer",
             background: "#7367F0", color: "#fff",
             font: "500 15px/20px var(--cg-font-sans)", whiteSpace: "nowrap",
-            boxShadow: "0 2px 6px rgba(115,103,240,.35)",
           }}
         >
           <i className="ti ti-plus" style={{ fontSize: 18 }} />
@@ -1613,7 +1611,6 @@ function DSLeftPanel({
           gap: 8, height: 40, borderRadius: 8, border: "none", cursor: "pointer",
           background: "#7367F0", color: "#fff",
           font: "600 14px/1 var(--cg-font-sans)",
-          boxShadow: "0 2px 6px rgba(115,103,240,.35)",
         }}>
           <i className="ti ti-plus" style={{ fontSize: 16 }} />
           New Agent
@@ -1648,7 +1645,6 @@ function DSLeftPanel({
                 cursor: item.stub ? "default" : "pointer",
                 background: isActive ? "linear-gradient(118deg,#7367F0,#9E95F5)" : "transparent",
                 color: isActive ? "#fff" : item.stub ? "#82868B" : "#4B465C",
-                boxShadow: isActive ? "0 2px 6px rgba(115,103,240,.35)" : "none",
                 font: "500 15px/20px var(--cg-font-sans)",
                 transition: "background .12s, color .12s",
               }}
